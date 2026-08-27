@@ -1,0 +1,6 @@
+releaseflow-data/
+bin/
+*.exe
+*.test
+*.out
+

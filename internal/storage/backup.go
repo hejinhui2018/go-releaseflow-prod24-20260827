@@ -31,34 +31,22 @@ func (s *FileStore) CreateBackup() (Backup, error) {
 }
 
 func (s *FileStore) RestoreBackup(path string) error {
-	currentIDs, err := s.loadIndex()
-	if err != nil {
-		return err
-	}
 	if err := copyFile(filepath.Join(path, filepath.Base(s.journal)), s.journal); err != nil {
 		return err
 	}
 	if err := copyFile(filepath.Join(path, filepath.Base(s.indexPath())), s.indexPath()); err != nil {
 		return err
 	}
-	restoredIDs, err := s.loadIndex()
-	if err != nil {
+	// Clear current snapshots so packets created after the backup don't linger
+	// and override the restored state when Packet() reads the snapshot first.
+	snapDir := s.layout().SnapshotDir()
+	if err := os.RemoveAll(snapDir); err != nil {
 		return err
 	}
-	seen := make(map[string]struct{}, len(restoredIDs))
-	for _, id := range restoredIDs {
-		seen[id] = struct{}{}
-	}
-	for _, id := range currentIDs {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		restoredIDs = append(restoredIDs, id)
-	}
-	if err := s.saveIndex(restoredIDs); err != nil {
+	if err := os.MkdirAll(snapDir, 0o755); err != nil {
 		return err
 	}
-	return copySnapshotDir(filepath.Join(path, "snapshots"), s.layout().SnapshotDir())
+	return copySnapshotDir(filepath.Join(path, "snapshots"), snapDir)
 }
 
 func copyFile(src, dst string) error {

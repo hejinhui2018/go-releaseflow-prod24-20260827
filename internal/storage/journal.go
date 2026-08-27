@@ -1,12 +1,9 @@
 package storage
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"example.com/releaseflow/internal/model"
@@ -75,28 +72,15 @@ func (s *FileStore) AppendEvent(evt model.Event) error {
 }
 
 func (s *FileStore) Events(packetID string) ([]model.Event, error) {
-	f, err := os.Open(s.journal)
+	all, err := s.AllEvents()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	var events []model.Event
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var evt model.Event
-		if err := decode([]byte(line), &evt); err != nil {
-			return nil, err
-		}
+	for _, evt := range all {
 		if evt.PacketID == packetID {
 			events = append(events, evt)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan journal: %w", err)
 	}
 	return events, nil
 }
@@ -105,22 +89,13 @@ func (s *FileStore) ListPacketIDs() ([]string, error) {
 	if ids, err := s.loadIndex(); err == nil && len(ids) > 0 {
 		return ids, nil
 	}
-	f, err := os.Open(s.journal)
+	all, err := s.AllEvents()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	seen := map[string]struct{}{}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		var evt model.Event
-		if err := decode(scanner.Bytes(), &evt); err != nil {
-			return nil, err
-		}
+	for _, evt := range all {
 		seen[evt.PacketID] = struct{}{}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 	var ids []string
 	for id := range seen {

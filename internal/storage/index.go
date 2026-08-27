@@ -64,6 +64,25 @@ func (s *FileStore) rebuildIndexFromJournal() error {
 	return s.saveIndex(ids)
 }
 
+// RebuildIndex repopulates the packet index from the current journal contents
+// so it reflects exactly the packets that still have events. It is used after
+// pruning the journal so the index no longer lists packets that were removed.
+func (s *FileStore) RebuildIndex() error {
+	seen := map[string]struct{}{}
+	events, err := s.AllEvents()
+	if err != nil {
+		return err
+	}
+	for _, evt := range events {
+		seen[evt.PacketID] = struct{}{}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	return s.saveIndex(ids)
+}
+
 func (s *FileStore) removeIndex(packetID string) error {
 	ids, err := s.loadIndex()
 	if err != nil {
